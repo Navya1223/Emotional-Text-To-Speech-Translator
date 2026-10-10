@@ -143,7 +143,7 @@ Download the Sentiment140 dataset and run `sentiment_modelling.ipynb`. The noteb
 streamlit run app.py
 ```
 
-The application opens in the browser at http://localhost:8501.
+The application then opens in your browser, usually at `http://localhost:8501` (this address works only on the computer where the app is running).
 
 ### Using the application
 
