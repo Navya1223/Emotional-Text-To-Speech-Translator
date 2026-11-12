@@ -4,6 +4,9 @@ A text-to-speech application that speaks with emotion. Users type a message, and
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB) ![TensorFlow](https://img.shields.io/badge/TensorFlow-Keras-FF6F00) ![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B) ![Accuracy](https://img.shields.io/badge/Model%20accuracy-79%25-2E7D32)
 
+**▶ Try the live browser demo: [navya1223.github.io/Emotional-Text-To-Speech-Translator](https://navya1223.github.io/Emotional-Text-To-Speech-Translator/)**
+<br><sub>Runs in any browser. It uses the same thresholds and voice settings as the app, with a lightweight word-list emotion detector instead of the LSTM model (see <a href="#live-browser-demo">Live browser demo</a>).</sub>
+
 <p align="center">
   <img src="images/app-home.png" alt="Application home screen" width="520">
 </p>
@@ -17,6 +20,7 @@ A text-to-speech application that speaks with emotion. Users type a message, and
 - [Emotion Detection Model](#emotion-detection-model)
 - [Results](#results)
 - [Screenshots](#screenshots)
+- [Live browser demo](#live-browser-demo)
 - [Installation and Usage](#installation-and-usage)
 - [Project Structure](#project-structure)
 - [Limitations and Future Work](#limitations-and-future-work)
@@ -113,6 +117,18 @@ The model achieves **79% accuracy** on the test set, with a precision and recall
 <p align="center">
   <img src="images/emotion-options.png" alt="Emotion options" width="520">
 </p>
+
+## Live browser demo
+A static version of the app runs on GitHub Pages: **https://navya1223.github.io/Emotional-Text-To-Speech-Translator/** (source: `docs/index.html`).
+
+| Step | Streamlit app (this repo) | Browser demo |
+| --- | --- | --- |
+| Emotion score | LSTM + Word2Vec model | Word-list scoring with negation and intensifiers |
+| Mapping | score ≤ 0.4 sad · 0.4–0.7 neutral · ≥ 0.7 happy | same |
+| Speech | pyttsx3 (rate, volume) | Web Speech API (rate, volume, plus pitch) |
+| Audio download | WAV file | not available |
+
+The trained model is not included in the repository, and a TensorFlow model cannot run in a static web page, so the demo replaces the model with a simple word-list scorer to show the end-to-end idea.
 
 ## Installation and Usage
 
