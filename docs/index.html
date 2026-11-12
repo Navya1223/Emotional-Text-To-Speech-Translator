@@ -147,6 +147,7 @@ a{color:var(--accent)}
       <div class="kv"><span>Volume</span><strong id="sVol">100%</strong></div>
       <div class="kv"><span>Pitch</span><strong id="sPitch">1.25</strong></div>
     </div>
+    <p class="note" id="styleNote"></p>
     <p class="spoken" id="spoken"></p>
     <div class="words" id="words"></div>
   </section>
@@ -158,15 +159,16 @@ a{color:var(--accent)}
       <tr><th>Step</th><th>Original project</th><th>This browser demo</th></tr>
       <tr><td>Emotion score</td><td>LSTM + Word2Vec (TensorFlow)</td><td>Word-list scoring with negation and intensifiers</td></tr>
       <tr><td>Mapping</td><td colspan="2">score ≤ 0.4 → sad · 0.4–0.7 → neutral · ≥ 0.7 → happy (same in both)</td></tr>
-      <tr><td>Speech</td><td>pyttsx3 (rate, volume)</td><td>Web Speech API (rate, volume, plus pitch)</td></tr>
+      <tr><td>Speech</td><td>pyttsx3 (rate, volume)</td><td>Web Speech API: rate, volume, pitch, plus a pitch melody and pauses per phrase</td></tr>
       <tr><td>Audio download</td><td>WAV file</td><td>Not available in the browser</td></tr>
     </table></div>
     <div class="tablewrap"><table>
-      <tr><th>Emotion</th><th>Rate (wpm)</th><th>Volume</th><th>Pitch (demo only)</th></tr>
-      <tr><td>Happy</td><td class="num">150</td><td class="num">100%</td><td class="num">1.25</td></tr>
-      <tr><td>Neutral</td><td class="num">120</td><td class="num">90%</td><td class="num">1.00</td></tr>
-      <tr><td>Sad</td><td class="num">90</td><td class="num">60%</td><td class="num">0.80</td></tr>
+      <tr><th>Emotion</th><th>Rate (wpm, original)</th><th>Volume</th><th>Pitch (demo)</th><th>Pause between phrases (demo)</th></tr>
+      <tr><td>Happy</td><td class="num">150</td><td class="num">100%</td><td class="num">1.55, rising</td><td class="num">0.1 s</td></tr>
+      <tr><td>Neutral</td><td class="num">120</td><td class="num">90%</td><td class="num">1.00, flat</td><td class="num">0.3 s</td></tr>
+      <tr><td>Sad</td><td class="num">90</td><td class="num">60%</td><td class="num">0.62, falling</td><td class="num">0.65 s</td></tr>
     </table></div>
+    <p class="note" style="margin-top:10px"><strong>Limitation:</strong> both versions use standard voices that can only change speed, pitch and loudness, so the emotion is suggested by prosody, not acted. Truly emotional voices need neural text-to-speech with emotion styles (for example Azure Neural TTS speaking styles such as <em>cheerful</em> or <em>sad</em>), which is the next step for this project. Voices differ a lot between browsers: in Chrome, the "Google US English" voices respond best to pitch changes.</p>
     <p class="note" style="margin-top:10px">Code and model notebook: <a href="https://github.com/Navya1223/Emotional-Text-To-Speech-Translator" target="_blank" rel="noopener">github.com/Navya1223/Emotional-Text-To-Speech-Translator</a></p>
   </details>
   <div class="warn" id="noSpeech" hidden>Your browser does not support speech output. Try Chrome, Edge or Safari on a computer.</div>
@@ -216,6 +218,8 @@ function loadVoices(){
   voices.forEach((v,i)=>{const o=document.createElement("option");o.value=i;o.textContent=`${v.name} (${v.lang})`;vSel.appendChild(o);});
   if(!voices.length){const o=document.createElement("option");o.textContent="Default voice";vSel.appendChild(o);}
   if(prev && vSel.querySelector(`option[value="${prev}"]`)) vSel.value=prev;
+  else { const pref=["Google US English","Google UK English Female","Samantha","Microsoft Aria","Microsoft Jenny","Karen","Daniel"];
+    for(const n of pref){const i=voices.findIndex(v=>v.name.includes(n)); if(i>=0){vSel.value=i;break;}} }
 }
 if(synth){loadVoices(); synth.onvoiceschanged=loadVoices;} else {document.getElementById("noSpeech").hidden=false; speakB.disabled=true;}
 
@@ -232,29 +236,56 @@ function update(){
   document.getElementById("scoreLine").textContent=`sentiment score ${c.s.toFixed(2)}${c.auto?"":" (not used, emotion chosen manually)"}`;
   document.getElementById("sRate").textContent=st.wpm+" wpm";
   document.getElementById("sVol").textContent=Math.round(st.vol*100)+"%";
-  document.getElementById("sPitch").textContent=st.pitch.toFixed(2);
+  document.getElementById("sPitch").textContent=STYLE[c.emo].pitch.toFixed(2);
+  document.getElementById("styleNote").textContent={happy:"Speaking style: fast, high and bright, with a bouncing melody and extra lift on exclamations, short pauses.",
+    neutral:"Speaking style: steady rate and flat pitch, normal pauses at the end of sentences.",
+    sad:"Speaking style: slow, low and quiet, short phrases with long pauses, and the pitch sinks further with each phrase."}[c.emo];
   spoken.textContent=txt.value; document.getElementById("words").textContent="";
 }
 txt.addEventListener("input",update);
 document.querySelectorAll('input[name="emo"]').forEach(r=>r.addEventListener("change",update));
 
+/* Prosody: split the text into short phrases and give each phrase its own rate, pitch,
+   volume and pause, so the melody of the sentence changes with the emotion. */
+const STYLE={
+  happy:  {rate:1.22, pitch:1.55, vol:1.0, pause:90,  chunk:/(?<=[,.!?;:])\s+/, contour:i=>(i%2?0.12:-0.04), exclaim:0.25},
+  neutral:{rate:0.95, pitch:1.0,  vol:0.9, pause:260, chunk:/(?<=[.!?;:])\s+/,  contour:()=>0, exclaim:0},
+  sad:    {rate:0.68, pitch:0.62, vol:0.55,pause:650, chunk:/(?<=[,.!?;:])\s+|\s+(?=(?:and|but|because|so)\s)/i, contour:i=>-0.06*i, exclaim:0}
+};
+let queue=[],stopped=false,timer=null;
+function phrases(text,emo){
+  let parts=text.split(STYLE[emo].chunk).map(x=>x.trim()).filter(Boolean);
+  if(emo==="sad"){ // break long sad phrases into slow, short pieces
+    parts=parts.flatMap(p=>{const w=p.split(/\s+/);const out=[];for(let i=0;i<w.length;i+=5) out.push(w.slice(i,i+5).join(" "));return out;});
+  }
+  return parts;
+}
 speakB.onclick=()=>{
   const text=txt.value.trim(); if(!text){status.textContent="Type a message first.";return;}
-  update(); const c=current(),st=SETTINGS[c.emo];
-  synth.cancel();
-  const u=new SpeechSynthesisUtterance(text);
-  if(voices[vSel.value]) u.voice=voices[vSel.value];
-  u.rate=st.wpm/130; u.volume=st.vol; u.pitch=st.pitch;
+  update(); const c=current(),st=STYLE[c.emo];
+  synth.cancel(); clearTimeout(timer); stopped=false;
+  const parts=phrases(text,c.emo); let offset=0;
+  queue=parts.map((p,i)=>{const at=text.indexOf(p,offset); offset=at+p.length; return {p,i,at};});
   const t0=performance.now();
-  u.onstart=()=>{status.textContent=`Speaking as ${c.emo}…`;stopB.disabled=false;speakB.disabled=true;};
-  u.onboundary=e=>{ if(e.name&&e.name!=="word") return; const i=e.charIndex; const m=text.slice(i).match(/^\S+/); const len=m?m[0].length:0;
-    spoken.innerHTML=""; spoken.append(text.slice(0,i)); const mk=document.createElement("mark"); mk.textContent=text.slice(i,i+len); spoken.append(mk,text.slice(i+len)); };
-  u.onend=u.onerror=()=>{spoken.textContent=text;stopB.disabled=true;speakB.disabled=false;
-    const secs=(performance.now()-t0)/1000,n=text.split(/\s+/).length;
-    status.textContent=`Done. ${n} words in ${secs.toFixed(1)} s.`;};
-  synth.speak(u);
+  stopB.disabled=false; speakB.disabled=true; status.textContent=`Speaking as ${c.emo}…`;
+  const finish=()=>{spoken.textContent=text;stopB.disabled=true;speakB.disabled=false;
+    if(!stopped){const secs=(performance.now()-t0)/1000,n=text.split(/\s+/).length;status.textContent=`Done. ${n} words in ${secs.toFixed(1)} s, ${parts.length} phrase${parts.length>1?"s":""}.`;}
+    else status.textContent="Stopped.";};
+  const next=()=>{
+    if(stopped||!queue.length){finish();return;}
+    const {p,i,at}=queue.shift();
+    const u=new SpeechSynthesisUtterance(p);
+    if(voices[vSel.value]) u.voice=voices[vSel.value];
+    let pitch=st.pitch+st.contour(i); if(/!$/.test(p)) pitch+=st.exclaim;
+    u.pitch=Math.max(0.1,Math.min(2,pitch)); u.rate=st.rate; u.volume=st.vol;
+    spoken.innerHTML=""; spoken.append(text.slice(0,at)); const mk=document.createElement("mark"); mk.textContent=p; spoken.append(mk,text.slice(at+p.length));
+    u.onend=()=>{timer=setTimeout(next,st.pause);};
+    u.onerror=()=>{finish();};
+    synth.speak(u);
+  };
+  next();
 };
-stopB.onclick=()=>{synth.cancel();};
+stopB.onclick=()=>{stopped=true;queue=[];clearTimeout(timer);synth.cancel();spoken.textContent=txt.value;stopB.disabled=true;speakB.disabled=false;status.textContent="Stopped.";};
 update();
 </script>
 

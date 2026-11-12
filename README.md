@@ -125,10 +125,12 @@ A static version of the app runs on GitHub Pages: **https://navya1223.github.io/
 | --- | --- | --- |
 | Emotion score | LSTM + Word2Vec model | Word-list scoring with negation and intensifiers |
 | Mapping | score ≤ 0.4 sad · 0.4–0.7 neutral · ≥ 0.7 happy | same |
-| Speech | pyttsx3 (rate, volume) | Web Speech API (rate, volume, plus pitch) |
+| Speech | pyttsx3 (rate, volume) | Web Speech API: rate, volume, pitch, plus a pitch melody and pauses per phrase |
 | Audio download | WAV file | not available |
 
 The trained model is not included in the repository, and a TensorFlow model cannot run in a static web page, so the demo replaces the model with a simple word-list scorer to show the end-to-end idea.
+
+To make the emotion more audible, the demo speaks phrase by phrase: happy speech is fast and high with a bouncing melody, neutral speech is steady, and sad speech is slow, low and quiet with long pauses and a falling pitch. Standard voices can only change speed, pitch and loudness, so emotion is suggested by prosody rather than acted; neural TTS with emotion styles (e.g. Azure Neural TTS *cheerful* / *sad*) is the planned next step.
 
 ## Installation and Usage
 
